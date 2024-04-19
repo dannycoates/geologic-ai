@@ -1,5 +1,6 @@
 /**
  * Calculates the sigmoid function of a given value.
+ * This is the activation function used by the neurons.
  * @param {number} x - The input value.
  * @returns {number} - The sigmoid value.
  */
@@ -17,35 +18,44 @@ function sigmoidDerivative(sigmoid) {
 }
 
 /**
- * Represents a single neuron in a neural network.
+ * A single neuron in a neural network.
  */
 class Neuron {
   /**
    * The inputs to the neuron.
+   * Each value is a number between 0 and 1.
    * @type {number[]}
    */
   inputs = [];
 
   /**
    * The output value of the neuron.
+   * It's value is between 0 and 1.
    * @type {number}
    */
   output = 0;
 
   /**
-   * The weights of the neuron's inputs.
+   * The weights used to calculate the output value.
+   * There is one weight per input value.
+   * These are updated during training.
    * @type {number[]}
    */
   weights = [];
 
   /**
    * The bias of the neuron.
+   * It is added to the weighted sum of the inputs to influence the output value
+   * and is updated during training.
    * @type {number}
    */
   bias = 0;
 
   /**
-   * The delta value used in backpropagation.
+   * The delta is used to update the weights during training.
+   * It is calculated during backpropagation from the error and the output derivative.
+   * A new delta is calculated for each neuron during backpropagation and used to
+   * update the weights.
    * @type {number}
    */
   delta = 0;
@@ -55,12 +65,16 @@ class Neuron {
    * @param {number} inputCount - The number of inputs to the neuron.
    */
   constructor(inputCount) {
-    this.weights = Array.from({ length: inputCount }, () => Math.random() - 0.5);
-    this.bias = 0.5;
+    this.weights = Array.from(
+      { length: inputCount },
+      () => Math.random() * 2 - 1 // random value between -1 and 1
+    );
+    this.bias = 0.1;
   }
 
   /**
    * Feeds forward the inputs through the neuron and calculates the output.
+   * Sigmoid is the activation function used to calculate the output value.
    * @param {number[]} inputs - The input values.
    * @returns {number} - The output value of the neuron.
    */
@@ -74,6 +88,8 @@ class Neuron {
 
   /**
    * Backpropagates the error through the neuron.
+   * This sets the delta value for the neuron which is used to update the weights
+   * of this neuron and the error of connected neurons in the previous layer.
    * @param {number} error - The error value.
    */
   backpropagate(error) {
@@ -90,10 +106,20 @@ class Neuron {
     }
     this.bias += learningRate * this.delta;
   }
+
+  /**
+   * Calculates the error for a given weight index.
+   * This is used by connected neurons in the previous layer.
+   * @param {number} index - The index of the weight.
+   * @returns {number} - The error value.
+   */
+  errorForWeight(index) {
+    return this.delta * this.weights[index];
+  }
 }
 
 /**
- * Represents a layer of neurons in a neural network.
+ * A layer of neurons in a neural network.
  */
 class Layer {
   /**
@@ -114,6 +140,10 @@ class Layer {
     );
   }
 
+  get size() {
+    return this.neurons.length;
+  }
+
   /**
    * Feeds forward the inputs through the layer and calculates the outputs.
    * @param {number[]} inputs - The input values.
@@ -129,12 +159,11 @@ class Layer {
    */
   backpropagate(nextLayer) {
     for (let i = 0; i < this.neurons.length; i++) {
-      const neuron = this.neurons[i];
-      let error = nextLayer.neurons.reduce(
-        (sum, nextNeuron) => sum + nextNeuron.weights[i] * nextNeuron.delta,
+      const error = nextLayer.neurons.reduce(
+        (sum, neuron) => sum + neuron.errorForWeight(i),
         0
       );
-      neuron.backpropagate(error);
+      this.neurons[i].backpropagate(error);
     }
   }
 
@@ -150,7 +179,7 @@ class Layer {
 }
 
 /**
- * Represents a neural network.
+ * A fully connected neural network.
  */
 export class NeuralNetwork {
   /**
@@ -169,6 +198,10 @@ export class NeuralNetwork {
     }
   }
 
+  get outputLayer() {
+    return this.layers[this.layers.length - 1];
+  }
+
   /**
    * Feeds forward the inputs through the neural network and calculates the outputs.
    * @param {number[]} inputs - The input values.
@@ -176,6 +209,7 @@ export class NeuralNetwork {
    */
   feedForward(inputs) {
     for (const layer of this.layers) {
+      // the output of the current layer becomes the input of the next layer
       inputs = layer.feedForward(inputs);
     }
     return inputs;
@@ -184,21 +218,25 @@ export class NeuralNetwork {
   /**
    * Backpropagates the error through the neural network.
    * @param {number[]} targetOutputs - The target output values from the training data.
+   * @returns {number} - The mean squared error of this iteration.
    */
   backpropagate(targetOutputs) {
+    let sumSquaredError = 0;
     // We process the layers in reverse order. The ouput layer
     // uses the target outputs, while the hidden layers use the
     // weights and deltas from the next layer.
-    const outputLayer = this.layers[this.layers.length - 1];
     for (let i = 0; i < targetOutputs.length; i++) {
-      const neuron = outputLayer.neurons[i];
+      const neuron = this.outputLayer.neurons[i];
       const target = targetOutputs[i];
-      neuron.backpropagate(target - neuron.output);
+      const error = target - neuron.output;
+      sumSquaredError += error * error;
+      neuron.backpropagate(error);
     }
 
     for (let i = this.layers.length - 2; i >= 0; i--) {
       this.layers[i].backpropagate(this.layers[i + 1]);
     }
+    return sumSquaredError / targetOutputs.length;
   }
 
   /**
@@ -213,28 +251,59 @@ export class NeuralNetwork {
 
   /**
    * Trains the neural network using the given inputs and target outputs.
-   * @param {{ image: number[], label: number }[]} inputs - The input values.
+   * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
    * @param {number} learningRate - The learning rate.
-   * @param {number} epochs - The number of training epochs.
+   * @param {number} epochs - The number of rounds of training to do over all the inputs.
    * @param {number} batchSize - The size of each training batch.
    */
   train(inputs, learningRate, epochs, batchSize) {
-    const trainingData = inputs.map(({ image, label }) => ({
-      image,
-      output: Array.from({ length: 10 }, (_, i) => (i === label ? 1 : 0)),
+    const trainingData = inputs.map(({ input, label }) => ({
+      input,
+      // Transform the label into an array representing the desired output layer values.
+      output: Array.from({ length: this.outputLayer.size }, (_, i) =>
+        i === label ? 1 : 0
+      ),
     }));
     for (let e = 0; e < epochs; e++) {
-      console.log(`Epoch ${e + 1}/${epochs}`);
-      const epochData = trainingData.sort(() => Math.random() - 0.5);
+      console.time(`Epoch ${e + 1}/${epochs}`);
+      const epochData = trainingData
+        .concat(
+          noise(
+            trainingData[0].input.length,
+            trainingData[0].output.length,
+            trainingData.length / 10
+          )
+        )
+        .sort(() => Math.random() - 0.5);
+      let error = 0;
       for (let i = 0; i < epochData.length; i += batchSize) {
         const batchData = epochData.slice(i, i + batchSize);
-
         for (let j = 0; j < batchData.length; j++) {
-          this.feedForward(batchData[j].image);
-          this.backpropagate(batchData[j].output);
+          this.feedForward(batchData[j].input);
+          error += this.backpropagate(batchData[j].output);
           this.updateWeights(learningRate);
         }
       }
+      console.timeEnd(`Epoch ${e + 1}/${epochs}`);
+      console.log(`mean squared error: ${error / epochData.length}`);
     }
   }
+}
+
+/**
+ * Random noise data that is labeled as outside the normal range.
+ * @param {number} inputLength - The length of the input data.
+ * @param {number} outputLength - The length of the output data.
+ * @param {number} length - The number of samples to generate.
+ * @returns {{ input: number[], output: number[] }[]} An array of objects containing the input and output data.
+ */
+function noise(inputLength = 28 * 28, outputLength = 11, length = 6000) {
+  const output = new Array(outputLength).fill(0);
+  output[output.length - 1] = 1;
+  return Array.from({ length }, () => {
+    return {
+      input: Array.from({ length: inputLength }, () => Math.random()),
+      output,
+    };
+  });
 }

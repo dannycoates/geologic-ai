@@ -6,13 +6,15 @@ import { NeuralNetwork } from "./nn.js";
  */
 async function main() {
   const data = await trainingData();
-  const network = new NeuralNetwork(784, 16, 16, 10);
-  network.train(data, 0.1, 10, 1000);
+  const first = data[0];
+  // The output layer has 11 neurons, one for each digit 0-9 and one for no digit.
+  const network = new NeuralNetwork(first.input.length, 16, 11);
+  network.train(data, 0.25, 20, 1000);
 
   const test = await testData();
   let correct = 0;
   for (let i = 0; i < test.length; i++) {
-    const outputs = network.feedForward(test[i].image);
+    const outputs = network.feedForward(test[i].input);
     const label = outputs.indexOf(Math.max(...outputs));
     const expected = test[i].label;
     if (label === expected) correct++;

@@ -7,7 +7,7 @@ const gunzipAsync = promisify(gunzip);
 /**
  * Parses the header of the MNIST data file.
  * @param {Buffer} buffer - The buffer containing the header data.
- * @returns {Object} An object containing the magic number and count.
+ * @returns {{ magic: number, count: number }} An object containing the magic number and count.
  */
 function parseHeader(buffer) {
   const magic = buffer.readUInt32BE(0);
@@ -23,10 +23,13 @@ function parseHeader(buffer) {
  */
 function parseImages(buffer, count) {
   const images = new Array(count);
-  // skip the dimensions header
-  let index = 8;
+  let index = 0;
+  const rows = buffer.readUInt32BE(index);
+  index += 4;
+  const cols = buffer.readUInt32BE(index);
+  index += 4;
   for (let i = 0; i < count; i++) {
-    images[i] = Array.from({ length: 28 * 28 }, () => buffer[index++] / 255);
+    images[i] = Array.from({ length: rows * cols }, () => buffer[index++] / 255);
   }
   return images;
 }
@@ -47,38 +50,42 @@ function parseLabels(buffer) {
  */
 function parseBuffer(buffer) {
   const { magic, count } = parseHeader(buffer);
-  const data = buffer.slice(8);
+  const data = buffer.subarray(8);
   if (magic === 2051) return parseImages(data, count);
   if (magic === 2049) return parseLabels(data);
   return null;
 }
 
 /**
+ * @typedef {{ input: number[], label: number }} LabelledInputData
+ */
+
+/**
  * Retrieves the data from the MNIST dataset.
  * @param {string} imagePath - The path to the image data file.
  * @param {string} labelPath - The path to the label data file.
- * @returns {Promise<{ image: number[], label: number}[]>} A promise that resolves to an array of objects containing the image and label data.
+ * @returns {Promise<LabelledInputData[]>} A promise that resolves to an array of objects containing the input and label data.
  */
 async function getData(imagePath, labelPath) {
   const rawImages = await gunzipAsync(await readFile(imagePath));
   const rawLabels = await gunzipAsync(await readFile(labelPath));
   const images = parseBuffer(rawImages);
   const labels = parseBuffer(rawLabels)
-  return images.map((image, i) => ({ image, label: labels[i] }));
+  return images.map((input, i) => ({ input, label: labels[i] }));
 }
 
 /**
  * Retrieves the training data from the MNIST dataset.
- * @returns {Promise<{ image: number[], label: number}[]>>} A promise that resolves to an array of objects containing the image and label data.
+ * @returns {Promise<LabelledInputData[]>>} A promise that resolves to an array of objects containing the input and label data.
  */
-export async function trainingData() {
+export function trainingData() {
   return getData("data/train-images-idx3-ubyte.gz", "data/train-labels-idx1-ubyte.gz");
 }
 
 /**
  * Retrieves the test data from the MNIST dataset.
- * @returns {Promise<{ image: number[], label: number}[]>>} A promise that resolves to an array of objects containing the image and label data.
+ * @returns {Promise<LabelledInputData[]>>} A promise that resolves to an array of objects containing the input and label data.
  */
-export async function testData() {
+export function testData() {
   return getData("data/t10k-images-idx3-ubyte.gz", "data/t10k-labels-idx1-ubyte.gz");
 }
