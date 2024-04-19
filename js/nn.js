@@ -2,7 +2,7 @@
  * Calculates the sigmoid function of a given value.
  * This is the activation function used by the neurons.
  * Sigmoid produces an S-shaped curve between 0 and 1.
- * Negative inputs produce values close to 0, and 
+ * Negative inputs produce values close to 0, and
  * positive inputs produce values close to 1.
  * @param {number} x - The input value.
  * @returns {number} - The sigmoid value.
@@ -61,8 +61,8 @@ class Neuron {
    * The delta is used to update the weights during training. It represents a
    * magnitude and direction (+/-) that the weights should be changed to reduce
    * the error. It is part of the gradient descent algorithm.
-   * It is calculated during backpropagation from the error and the output 
-   * derivative. A new delta is calculated during backpropagation and used to 
+   * It is calculated during backpropagation from the error and the output
+   * derivative. A new delta is calculated during backpropagation and used to
    * update the weights.
    * @type {number}
    */
@@ -75,7 +75,7 @@ class Neuron {
   constructor(inputCount) {
     this.weights = Array.from(
       { length: inputCount },
-      () => Math.random() * 2 - 1 // random value between -1 and 1
+      () => Math.random() - 0.5 // random value between -0.5 and 0.5
     );
     this.bias = 0.1;
   }
@@ -103,6 +103,7 @@ class Neuron {
    * @param {number} error - The error value.
    */
   backpropagate(error) {
+    // remember, this.output is a sigmoid value
     this.delta = error * sigmoidDerivative(this.output);
   }
 
@@ -160,7 +161,11 @@ class Layer {
    * @returns {number[]} - The output values of the layer.
    */
   feedForward(inputs) {
-    return this.neurons.map((neuron) => neuron.feedForward(inputs));
+    const outputs = new Array(this.neurons.length);
+    for (let i = 0; i < this.neurons.length; i++) {
+      outputs[i] = this.neurons[i].feedForward(inputs);
+    }
+    return outputs;
   }
 
   /**
@@ -206,7 +211,7 @@ export class NeuralNetwork {
    * const network = new NeuralNetwork(784, 16, 11);
    */
   constructor(...layerSizes) {
-    // The input layer is implicit. 
+    // The input layer is implicit.
     // It's size determines the number of inputs to the next layer.
     for (let i = 1; i < layerSizes.length; i++) {
       this.layers.push(new Layer(layerSizes[i], layerSizes[i - 1]));
@@ -273,9 +278,8 @@ export class NeuralNetwork {
    * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
    * @param {number} learningRate - The learning rate.
    * @param {number} epochs - The number of rounds of training to do over all the inputs.
-   * @param {number} batchSize - The size of each training batch.
    */
-  train(inputs, learningRate, epochs, batchSize) {
+  train(inputs, learningRate, epochs) {
     const trainingData = inputs.map(({ input, label }) => ({
       input,
       // Transform the label into an array representing the desired output layer values.
@@ -283,8 +287,8 @@ export class NeuralNetwork {
         i === label ? 1 : 0
       ),
     }));
-    for (let e = 0; e < epochs; e++) {
-      console.time(`Epoch ${e + 1}/${epochs}`);
+    for (let epoch = 1; epoch <= epochs; epoch++) {
+      console.time(`Epoch ${epoch}/${epochs}`);
       const epochData = trainingData
         .concat(
           noise(
@@ -295,15 +299,12 @@ export class NeuralNetwork {
         )
         .sort(() => Math.random() - 0.5);
       let error = 0;
-      for (let i = 0; i < epochData.length; i += batchSize) {
-        const batchData = epochData.slice(i, i + batchSize);
-        for (let j = 0; j < batchData.length; j++) {
-          this.feedForward(batchData[j].input);
-          error += this.backpropagate(batchData[j].output);
-          this.updateWeights(learningRate);
-        }
+      for (const { input, output } of epochData) {
+        this.feedForward(input);
+        error += this.backpropagate(output);
+        this.updateWeights(learningRate);
       }
-      console.timeEnd(`Epoch ${e + 1}/${epochs}`);
+      console.timeEnd(`Epoch ${epoch}/${epochs}`);
       console.log(`mean squared error: ${error / epochData.length}`);
     }
   }
