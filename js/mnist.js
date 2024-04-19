@@ -79,7 +79,7 @@ async function getData(imagePath, labelPath) {
  * @returns {Promise<LabelledInputData[]>>} A promise that resolves to an array of objects containing the input and label data.
  */
 export function trainingData() {
-  return getData("data/train-images-idx3-ubyte.gz", "data/train-labels-idx1-ubyte.gz");
+  return getData("../data/train-images-idx3-ubyte.gz", "../data/train-labels-idx1-ubyte.gz");
 }
 
 /**
@@ -87,5 +87,5 @@ export function trainingData() {
  * @returns {Promise<LabelledInputData[]>>} A promise that resolves to an array of objects containing the input and label data.
  */
 export function testData() {
-  return getData("data/t10k-images-idx3-ubyte.gz", "data/t10k-labels-idx1-ubyte.gz");
+  return getData("../data/t10k-images-idx3-ubyte.gz", "../data/t10k-labels-idx1-ubyte.gz");
 }

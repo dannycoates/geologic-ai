@@ -1,6 +1,9 @@
 /**
  * Calculates the sigmoid function of a given value.
  * This is the activation function used by the neurons.
+ * Sigmoid produces an S-shaped curve between 0 and 1.
+ * Negative inputs produce values close to 0, and 
+ * positive inputs produce values close to 1.
  * @param {number} x - The input value.
  * @returns {number} - The sigmoid value.
  */
@@ -38,7 +41,9 @@ class Neuron {
   /**
    * The weights used to calculate the output value.
    * There is one weight per input value.
-   * These are updated during training.
+   * These are updated during training to improve the accuracy of the network.
+   * A larger weight value makes it's corresponding input value more influential
+   * in the output calculation.
    * @type {number[]}
    */
   weights = [];
@@ -46,15 +51,18 @@ class Neuron {
   /**
    * The bias of the neuron.
    * It is added to the weighted sum of the inputs to influence the output value
-   * and is updated during training.
+   * and is updated during training. A larger bias value makes it easier for the
+   * neuron to fire and produce an output value closer to 1.
    * @type {number}
    */
   bias = 0;
 
   /**
-   * The delta is used to update the weights during training.
-   * It is calculated during backpropagation from the error and the output derivative.
-   * A new delta is calculated for each neuron during backpropagation and used to
+   * The delta is used to update the weights during training. It represents a
+   * magnitude and direction (+/-) that the weights should be changed to reduce
+   * the error. It is part of the gradient descent algorithm.
+   * It is calculated during backpropagation from the error and the output 
+   * derivative. A new delta is calculated during backpropagation and used to 
    * update the weights.
    * @type {number}
    */
@@ -80,9 +88,11 @@ class Neuron {
    */
   feedForward(inputs) {
     this.inputs = inputs;
-    this.output = sigmoid(
-      inputs.reduce((sum, input, i) => sum + input * this.weights[i], this.bias)
-    );
+    let weightedSum = 0;
+    for (let i = 0; i < inputs.length; i++) {
+      weightedSum += inputs[i] * this.weights[i];
+    }
+    this.output = sigmoid(weightedSum + this.bias);
     return this.output;
   }
 
@@ -159,10 +169,10 @@ class Layer {
    */
   backpropagate(nextLayer) {
     for (let i = 0; i < this.neurons.length; i++) {
-      const error = nextLayer.neurons.reduce(
-        (sum, neuron) => sum + neuron.errorForWeight(i),
-        0
-      );
+      let error = 0;
+      for (const neuron of nextLayer.neurons) {
+        error += neuron.errorForWeight(i);
+      }
       this.neurons[i].backpropagate(error);
     }
   }
@@ -191,13 +201,22 @@ export class NeuralNetwork {
   /**
    * Creates a new instance of the NeuralNetwork class.
    * @param {...number} layerSizes - The sizes of the layers in the neural network.
+   * @example
+   * // create a network with 3 layers: 784 input, 16 hidden, 11 output
+   * const network = new NeuralNetwork(784, 16, 11);
    */
   constructor(...layerSizes) {
+    // The input layer is implicit. 
+    // It's size determines the number of inputs to the next layer.
     for (let i = 1; i < layerSizes.length; i++) {
       this.layers.push(new Layer(layerSizes[i], layerSizes[i - 1]));
     }
   }
 
+  /**
+   * The last layer in the neural network.
+   * @type {Layer}
+   */
   get outputLayer() {
     return this.layers[this.layers.length - 1];
   }
