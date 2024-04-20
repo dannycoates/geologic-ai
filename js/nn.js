@@ -1,9 +1,13 @@
 /**
- * Calculates the sigmoid function of a given value.
- * This is the activation function used by the neurons.
+ * Sigmoid is the activation function used by the neurons.
  * Sigmoid produces an S-shaped curve between 0 and 1.
  * Negative inputs produce values close to 0, and
  * positive inputs produce values close to 1.
+ *
+ * Other activation functions like ReLU (Rectified Linear Unit)
+ * may also be used, but sigmoid is simple and works well for
+ * this example.
+ *
  * @param {number} x - The input value.
  * @returns {number} - The sigmoid value.
  */
@@ -13,7 +17,9 @@ function sigmoid(x) {
 
 /**
  * Calculates the derivative of the sigmoid function for a given value.
- * @param {number} sigmoid - The input value.
+ * This gives the slope of the curve at that point.
+ *
+ * @param {number} sigmoid - A sigmoid value (0-1) computed earlier.
  * @returns {number} - The sigmoid derivative value.
  */
 function sigmoidDerivative(sigmoid) {
@@ -27,6 +33,7 @@ class Neuron {
   /**
    * The inputs to the neuron.
    * Each value is a number between 0 and 1.
+   *
    * @type {number[]}
    */
   inputs = [];
@@ -34,6 +41,7 @@ class Neuron {
   /**
    * The output value of the neuron.
    * It's value is between 0 and 1.
+   *
    * @type {number}
    */
   output = 0;
@@ -44,6 +52,7 @@ class Neuron {
    * These are updated during training to improve the accuracy of the network.
    * A larger weight value makes it's corresponding input value more influential
    * in the output calculation.
+   *
    * @type {number[]}
    */
   weights = [];
@@ -53,32 +62,45 @@ class Neuron {
    * It is added to the weighted sum of the inputs to influence the output value
    * and is updated during training. A larger bias value makes it easier for the
    * neuron to fire and produce an output value closer to 1.
+   *
    * @type {number}
    */
   bias = 0;
 
   /**
-   * The delta is used to update the weights during training. It represents a
-   * magnitude and direction (+/-) that the weights should be changed to reduce
+   * The error of the neuron. It is used to calculate a delta value for each
+   * weight and bias during backpropagation. The delta value represents the
+   * magnitude and direction (+/-) that the weight should be changed to reduce
    * the error. It is part of the gradient descent algorithm.
-   * It is calculated during backpropagation from the error and the output
-   * derivative.
+   *
+   * The deltaBiasSum and deltaWeightSums below are used to accumulate the deltas
+   * over multiple samples in a batch before updating the weights. These sums are
+   * divided by the number of samples in the batch to get the average delta.
+   *
+   * Batches are used to speed up training.
+   *
    * @type {number}
    */
-  currentDelta = 0;
+  error = 0;
 
   /**
    * The sum of the deltas for the bias during a batch.
-   * Batches are used to speed up training by averaging the deltas
-   * over multiple samples.
+   * The bias delta is proportional to the error of the neuron and the derivative
+   * of the activation function (sigmoid in this case), i.e. the slope of the curve.
+   *
+   * These deltas are summed over a batch of samples before updating the bias.
+   *
    * @type {number}
    */
   deltaBiasSum = 0;
 
   /**
    * The sum of the deltas for the weights during a batch.
-   * Batches are used to speed up training by averaging the deltas
-   * over multiple samples.
+   * The weight delta is proportional to the error of the neuron, the derivative
+   * of the activation function, and the input value.
+   *
+   * These deltas are summed over a batch of samples before updating the weights.
+   *
    * @type {number[]}
    */
   deltaWeightSums = [];
@@ -87,12 +109,14 @@ class Neuron {
    * The number of samples in the batch.
    * It is incremented during backpropagation and
    * reset to 0 after the weights are updated.
+   *
    * @type {number}
    */
   sampleCounter = 0;
 
   /**
    * Creates a new instance of the Neuron class.
+   *
    * @param {number} inputCount - The number of inputs to the neuron.
    */
   constructor(inputCount) {
@@ -107,6 +131,7 @@ class Neuron {
   /**
    * Feeds forward the inputs through the neuron and calculates the output.
    * Sigmoid is the activation function used to calculate the output value.
+   *
    * @param {number[]} inputs - The input values.
    * @returns {number} - The output value of the neuron.
    */
@@ -122,29 +147,38 @@ class Neuron {
 
   /**
    * Backpropagates the error through the neuron.
-   * This sets the delta values for the neuron which is used to update the weights
-   * of this neuron and the error of connected neurons in the previous layer.
+   * This accumulates the delta values which are
+   * later used to update the weights and bias.
+   *
    * @param {number} error - The error value.
    */
   backpropagate(error) {
+    this.error = error;
     // remember, this.output is a sigmoid value
-    this.currentDelta = error * sigmoidDerivative(this.output);
-    this.deltaBiasSum += this.currentDelta;
+    const delta = error * sigmoidDerivative(this.output);
+    this.deltaBiasSum += delta;
     for (let i = 0; i < this.inputs.length; i++) {
-      this.deltaWeightSums[i] += this.currentDelta * this.inputs[i];
+      this.deltaWeightSums[i] += delta * this.inputs[i];
     }
     this.sampleCounter++;
   }
 
   /**
-   * Updates the weights and bias of the neuron.
+   * Updates the weights and bias based on the accumulated deltas
+   * and the learning rate.
+   *
+   * The learning rate determines how much the weights and bias are adjusted
+   * during training. A higher learning rate can speed up training, but if it's
+   * too high, the network may not converge; overshooting the optimal weights.
+   *
    * @param {number} learningRate - The learning rate.
    */
   updateWeights(learningRate) {
     for (let i = 0; i < this.weights.length; i++) {
-      this.weights[i] -= learningRate * this.deltaWeightSums[i] / this.sampleCounter;
+      this.weights[i] +=
+        (learningRate * this.deltaWeightSums[i]) / this.sampleCounter;
     }
-    this.bias -= learningRate * this.deltaBiasSum / this.sampleCounter
+    this.bias += (learningRate * this.deltaBiasSum) / this.sampleCounter;
     this.sampleCounter = 0;
     this.deltaBiasSum = 0;
     this.deltaWeightSums.fill(0);
@@ -152,12 +186,18 @@ class Neuron {
 
   /**
    * Calculates the error for a given weight index.
-   * This is used by connected neurons in the previous layer.
+   * It is proportional to the error of the neuron, the weight, and the derivative
+   * of the activation function on the output value.
+   * 
+   * It is used by connected neurons in the previous layer to accumulate their error.
+   * This is how the error is backpropagated through the network. It almost seems like
+   * magic, but it's just the chain rule of calculus.
+   *
    * @param {number} index - The index of the weight.
    * @returns {number} - The error value.
    */
   errorForWeight(index) {
-    return this.currentDelta * this.weights[index];
+    return this.error * this.weights[index] * sigmoidDerivative(this.output);
   }
 }
 
@@ -173,6 +213,7 @@ class Layer {
 
   /**
    * Creates a new instance of the Layer class.
+   * 
    * @param {number} neuronCount - The number of neurons in the layer.
    * @param {number} inputCount - The number of inputs per neuron.
    */
@@ -189,6 +230,7 @@ class Layer {
 
   /**
    * Feeds forward the inputs through the layer and calculates the outputs.
+   * 
    * @param {number[]} inputs - The input values.
    * @returns {number[]} - The output values of the layer.
    */
@@ -197,11 +239,12 @@ class Layer {
     for (let i = 0; i < this.neurons.length; i++) {
       outputs[i] = this.neurons[i].feedForward(inputs);
     }
-    return outputs
+    return outputs;
   }
 
   /**
    * Backpropagates the error through the layer.
+   * 
    * @param {Layer} nextLayer - The next layer in the neural network.
    */
   backpropagate(nextLayer) {
@@ -216,6 +259,7 @@ class Layer {
 
   /**
    * Updates the weights and biases of the neurons in the layer.
+   * 
    * @param {number} learningRate - The learning rate.
    */
   updateWeights(learningRate) {
@@ -237,6 +281,7 @@ export class NeuralNetwork {
 
   /**
    * Creates a new instance of the NeuralNetwork class.
+   * 
    * @param {...number} layerSizes - The sizes of the layers in the neural network.
    * @example
    * // create a network with 3 layers: 784 input, 16 hidden, 11 output
@@ -260,6 +305,7 @@ export class NeuralNetwork {
 
   /**
    * Feeds forward the inputs through the neural network and calculates the outputs.
+   * 
    * @param {number[]} inputs - The input values.
    * @returns {number[]} - The output values of the neural network.
    */
@@ -273,6 +319,7 @@ export class NeuralNetwork {
 
   /**
    * Backpropagates the error through the neural network.
+   * 
    * @param {number[]} targetOutputs - The target output values from the training data.
    * @returns {number} - The mean squared error of this iteration.
    */
@@ -285,9 +332,9 @@ export class NeuralNetwork {
       const neuron = this.outputLayer.neurons[i];
       const target = targetOutputs[i];
       // Intuitively, the error of the output layer is the difference
-      // between the actual output and the target output.
-      // If the output is close to the target, the error is small.
-      const error = neuron.output - target;
+      // between the target output and the actual output.
+      // When the output is close to the target, the error is small.
+      const error = target - neuron.output;
       squaredErrorSum += error * error;
       neuron.backpropagate(error);
     }
@@ -300,6 +347,7 @@ export class NeuralNetwork {
 
   /**
    * Updates the weights and biases of the neural network.
+   * 
    * @param {number} learningRate - The learning rate.
    */
   updateWeights(learningRate) {
@@ -310,6 +358,7 @@ export class NeuralNetwork {
 
   /**
    * Trains the neural network using the given inputs and target outputs.
+   * 
    * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
    * @param {number} learningRate - The higher the learning rate, the faster the network learns.
    *                                However, if it's too high, the network may not converge.
@@ -356,6 +405,9 @@ export class NeuralNetwork {
 
 /**
  * Random noise data that is labeled as outside the normal range.
+ * This can be used to train the neural network to recognize when the input
+ * data is not a valid element the expected set.
+ * 
  * @param {number} inputLength - The length of the input data.
  * @param {number} outputLength - The length of the output data.
  * @param {number} length - The number of samples to generate.
