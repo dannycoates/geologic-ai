@@ -62,11 +62,34 @@ class Neuron {
    * magnitude and direction (+/-) that the weights should be changed to reduce
    * the error. It is part of the gradient descent algorithm.
    * It is calculated during backpropagation from the error and the output
-   * derivative. A new delta is calculated during backpropagation and used to
-   * update the weights.
+   * derivative.
    * @type {number}
    */
-  delta = 0;
+  currentDelta = 0;
+
+  /**
+   * The sum of the deltas for the bias during a batch.
+   * Batches are used to speed up training by averaging the deltas
+   * over multiple samples.
+   * @type {number}
+   */
+  deltaBiasSum = 0;
+
+  /**
+   * The sum of the deltas for the weights during a batch.
+   * Batches are used to speed up training by averaging the deltas
+   * over multiple samples.
+   * @type {number[]}
+   */
+  deltaWeightSums = [];
+
+  /**
+   * The number of samples in the batch.
+   * It is incremented during backpropagation and
+   * reset to 0 after the weights are updated.
+   * @type {number}
+   */
+  sampleCounter = 0;
 
   /**
    * Creates a new instance of the Neuron class.
@@ -78,6 +101,7 @@ class Neuron {
       () => Math.random() - 0.5 // random value between -0.5 and 0.5
     );
     this.bias = 0.1;
+    this.deltaWeightSums = Array(inputCount).fill(0);
   }
 
   /**
@@ -98,13 +122,18 @@ class Neuron {
 
   /**
    * Backpropagates the error through the neuron.
-   * This sets the delta value for the neuron which is used to update the weights
+   * This sets the delta values for the neuron which is used to update the weights
    * of this neuron and the error of connected neurons in the previous layer.
    * @param {number} error - The error value.
    */
   backpropagate(error) {
     // remember, this.output is a sigmoid value
-    this.delta = error * sigmoidDerivative(this.output);
+    this.currentDelta = error * sigmoidDerivative(this.output);
+    this.deltaBiasSum += this.currentDelta;
+    for (let i = 0; i < this.inputs.length; i++) {
+      this.deltaWeightSums[i] += this.currentDelta * this.inputs[i];
+    }
+    this.sampleCounter++;
   }
 
   /**
@@ -113,9 +142,12 @@ class Neuron {
    */
   updateWeights(learningRate) {
     for (let i = 0; i < this.weights.length; i++) {
-      this.weights[i] += learningRate * this.delta * this.inputs[i];
+      this.weights[i] -= learningRate * this.deltaWeightSums[i] / this.sampleCounter;
     }
-    this.bias += learningRate * this.delta;
+    this.bias -= learningRate * this.deltaBiasSum / this.sampleCounter
+    this.sampleCounter = 0;
+    this.deltaBiasSum = 0;
+    this.deltaWeightSums.fill(0);
   }
 
   /**
@@ -125,7 +157,7 @@ class Neuron {
    * @returns {number} - The error value.
    */
   errorForWeight(index) {
-    return this.delta * this.weights[index];
+    return this.currentDelta * this.weights[index];
   }
 }
 
@@ -161,11 +193,11 @@ class Layer {
    * @returns {number[]} - The output values of the layer.
    */
   feedForward(inputs) {
-    const outputs = new Array(this.neurons.length);
+    const outputs = Array(this.neurons.length);
     for (let i = 0; i < this.neurons.length; i++) {
       outputs[i] = this.neurons[i].feedForward(inputs);
     }
-    return outputs;
+    return outputs
   }
 
   /**
@@ -245,22 +277,25 @@ export class NeuralNetwork {
    * @returns {number} - The mean squared error of this iteration.
    */
   backpropagate(targetOutputs) {
-    let sumSquaredError = 0;
+    let squaredErrorSum = 0;
     // We process the layers in reverse order. The ouput layer
     // uses the target outputs, while the hidden layers use the
     // weights and deltas from the next layer.
     for (let i = 0; i < targetOutputs.length; i++) {
       const neuron = this.outputLayer.neurons[i];
       const target = targetOutputs[i];
-      const error = target - neuron.output;
-      sumSquaredError += error * error;
+      // Intuitively, the error of the output layer is the difference
+      // between the actual output and the target output.
+      // If the output is close to the target, the error is small.
+      const error = neuron.output - target;
+      squaredErrorSum += error * error;
       neuron.backpropagate(error);
     }
 
     for (let i = this.layers.length - 2; i >= 0; i--) {
       this.layers[i].backpropagate(this.layers[i + 1]);
     }
-    return sumSquaredError / targetOutputs.length;
+    return squaredErrorSum / targetOutputs.length;
   }
 
   /**
@@ -276,10 +311,15 @@ export class NeuralNetwork {
   /**
    * Trains the neural network using the given inputs and target outputs.
    * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
-   * @param {number} learningRate - The learning rate.
-   * @param {number} epochs - The number of rounds of training to do over all the inputs.
+   * @param {number} learningRate - The higher the learning rate, the faster the network learns.
+   *                                However, if it's too high, the network may not converge.
+   * @param {number} [epochs=1] - The number of rounds of training to do over all the inputs.
+   *                              More epochs can improve accuracy, but can also lead to overfitting.
+   * @param {number} [batchSize=1] - The number of samples to process before updating the weights.
+   *                                 Larger batch sizes can speed up training, but may be less accurate.
    */
-  train(inputs, learningRate, epochs) {
+  train(inputs, learningRate, epochs = 1, batchSize = 1) {
+    console.time("Training time");
     const trainingData = inputs.map(({ input, label }) => ({
       input,
       // Transform the label into an array representing the desired output layer values.
@@ -287,9 +327,9 @@ export class NeuralNetwork {
         i === label ? 1 : 0
       ),
     }));
-    for (let epoch = 1; epoch <= epochs; epoch++) {
-      console.time(`Epoch ${epoch}/${epochs}`);
-      const epochData = trainingData
+    for (let i = 1; i <= epochs; i++) {
+      console.time(`Epoch ${i}/${epochs}`);
+      const epoch = trainingData
         .concat(
           noise(
             trainingData[0].input.length,
@@ -299,14 +339,18 @@ export class NeuralNetwork {
         )
         .sort(() => Math.random() - 0.5);
       let error = 0;
-      for (const { input, output } of epochData) {
-        this.feedForward(input);
-        error += this.backpropagate(output);
+      for (let j = 0; j < epoch.length; j += batchSize) {
+        const batch = epoch.slice(j, j + batchSize);
+        for (const { input, output } of batch) {
+          this.feedForward(input);
+          error += this.backpropagate(output);
+        }
         this.updateWeights(learningRate);
       }
-      console.timeEnd(`Epoch ${epoch}/${epochs}`);
-      console.log(`mean squared error: ${error / epochData.length}`);
+      console.timeEnd(`Epoch ${i}/${epochs}`);
+      console.log(`mean squared error: ${error / epoch.length}`);
     }
+    console.timeEnd("Training time");
   }
 }
 
@@ -318,7 +362,7 @@ export class NeuralNetwork {
  * @returns {{ input: number[], output: number[] }[]} An array of objects containing the input and output data.
  */
 function noise(inputLength = 28 * 28, outputLength = 11, length = 6000) {
-  const output = new Array(outputLength).fill(0);
+  const output = Array(outputLength).fill(0);
   output[output.length - 1] = 1;
   return Array.from({ length }, () => {
     return {
