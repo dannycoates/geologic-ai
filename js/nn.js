@@ -82,6 +82,7 @@ export class NeuralNetwork {
       // Intuitively, the error of the output layer is the difference
       // between the target output and the actual output.
       // When the output is close to the target, the error is small.
+      // The sign of the error tells us which direction to adjust the weights.
       const error = target - neuron.output;
       neuron.backpropagate(error);
       // Mean squared error is a simple way to measure the error.
@@ -375,10 +376,11 @@ class Neuron {
    */
   updateWeights(learningRate) {
     for (let i = 0; i < this.weights.length; i++) {
-      this.weights[i] +=
-        (learningRate * this.deltaWeightSums[i]) / this.sampleCounter;
+      const averageDeltaWeight = this.deltaWeightSums[i] / this.sampleCounter;
+      this.weights[i] += learningRate * averageDeltaWeight;
     }
-    this.bias += (learningRate * this.deltaBiasSum) / this.sampleCounter;
+    const averageDeltaBias = this.deltaBiasSum / this.sampleCounter;
+    this.bias += learningRate * averageDeltaBias;
 
     // reset the sums and sample counter for the next batch
     this.sampleCounter = 0;
@@ -424,7 +426,8 @@ function sigmoid(x) {
 
 /**
  * Calculates the derivative of the sigmoid function for a given value.
- * This gives the slope of the curve at that point.
+ * This gives the slope of the curve at that point. A high slope leads to
+ * the weights being adjusted more during training.
  *
  * @param {number} sigmoid - A sigmoid value (0-1) computed earlier.
  * @returns {number} - The sigmoid derivative value.
