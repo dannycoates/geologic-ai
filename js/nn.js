@@ -7,6 +7,8 @@
  * Other activation functions like ReLU (Rectified Linear Unit)
  * may also be used, but sigmoid is simple and works well for
  * this example.
+ * 
+ * @see {@link https://en.wikipedia.org/wiki/Sigmoid_function}
  *
  * @param {number} x - The input value.
  * @returns {number} - The sigmoid value.
@@ -179,6 +181,8 @@ class Neuron {
         (learningRate * this.deltaWeightSums[i]) / this.sampleCounter;
     }
     this.bias += (learningRate * this.deltaBiasSum) / this.sampleCounter;
+
+    // reset the sums and sample counter for the next batch
     this.sampleCounter = 0;
     this.deltaBiasSum = 0;
     this.deltaWeightSums.fill(0);
@@ -249,6 +253,8 @@ class Layer {
    */
   backpropagate(nextLayer) {
     for (let i = 0; i < this.neurons.length; i++) {
+      // The error for this neuron is the sum of the error of all 
+      // the weights that took the output of this neuron as input.
       let error = 0;
       for (const neuron of nextLayer.neurons) {
         error += neuron.errorForWeight(i);
@@ -322,6 +328,9 @@ export class NeuralNetwork {
    * 
    * @param {number[]} targetOutputs - The target output values from the training data.
    * @returns {number} - The mean squared error of this iteration.
+   *                     This tells us how well the network is learning.
+   *                     The lower the error, the better the network is performing.
+   *                     @see {@link https://en.wikipedia.org/wiki/Mean_squared_error}
    */
   backpropagate(targetOutputs) {
     let squaredErrorSum = 0;
@@ -335,8 +344,13 @@ export class NeuralNetwork {
       // between the target output and the actual output.
       // When the output is close to the target, the error is small.
       const error = target - neuron.output;
-      squaredErrorSum += error * error;
       neuron.backpropagate(error);
+      // Mean squared error is a simple way to measure the error.
+      // Mathematically, it's referred to as a loss or cost function.
+      // There are many other loss functions to choose from.
+      // Ours is a quadratic loss function.
+      // @see {@link https://en.wikipedia.org/wiki/Loss_function#Quadratic_loss_function}
+      squaredErrorSum += error * error;
     }
 
     for (let i = this.layers.length - 2; i >= 0; i--) {
@@ -360,14 +374,14 @@ export class NeuralNetwork {
    * Trains the neural network using the given inputs and target outputs.
    * 
    * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
-   * @param {number} learningRate - The higher the learning rate, the faster the network learns.
+   * @param {number} [learningRate=1] - The higher the learning rate, the faster the network learns.
    *                                However, if it's too high, the network may not converge.
    * @param {number} [epochs=1] - The number of rounds of training to do over all the inputs.
    *                              More epochs can improve accuracy, but can also lead to overfitting.
    * @param {number} [batchSize=1] - The number of samples to process before updating the weights.
    *                                 Larger batch sizes can speed up training, but may be less accurate.
    */
-  train(inputs, learningRate, epochs = 1, batchSize = 1) {
+  train(inputs, learningRate = 1, epochs = 1, batchSize = 1) {
     console.time("Training time");
     const trainingData = inputs.map(({ input, label }) => ({
       input,
@@ -404,9 +418,9 @@ export class NeuralNetwork {
 }
 
 /**
- * Random noise data that is labeled as outside the normal range.
+ * Random noise data that is labeled as outside the normal range of output.
  * This can be used to train the neural network to recognize when the input
- * data is not a valid element the expected set.
+ * data is not a valid element in the expected set.
  * 
  * @param {number} inputLength - The length of the input data.
  * @param {number} outputLength - The length of the output data.
