@@ -182,6 +182,12 @@ class Layer {
   neurons = [];
 
   /**
+   * The output values of the layer.
+   * @type {Float64Array}
+   */
+  outputs = new Float64Array(0);
+
+  /**
    * Creates a new instance of the Layer class.
    * 
    * @param {number} neuronCount - The number of neurons in the layer.
@@ -193,6 +199,7 @@ class Layer {
       { length: neuronCount },
       () => new Neuron(inputCount)
     );
+    this.outputs = new Float64Array(neuronCount);
   }
 
   get size() {
@@ -206,11 +213,10 @@ class Layer {
    * @returns {Float64Array} - The output values of the layer.
    */
   feedForward(inputs) {
-    const outputs = new Float64Array(this.neurons.length);
     for (let i = 0; i < this.neurons.length; i++) {
-      outputs[i] = this.neurons[i].feedForward(inputs);
+      this.outputs[i] = this.neurons[i].feedForward(inputs);
     }
-    return outputs;
+    return this.outputs;
   }
 
   /**
@@ -348,7 +354,7 @@ class Neuron {
       () => (Math.random() - 0.5) * 0.5
     );
     this.bias = 0.1;
-    this.deltaWeightSums = new Float64Array(inputCount); //Array(inputCount).fill(0);
+    this.deltaWeightSums = new Float64Array(inputCount);
   }
 
   /**

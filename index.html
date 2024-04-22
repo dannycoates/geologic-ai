@@ -30,7 +30,7 @@
           for (let j = 0; j < width; j++) {
             row[j] = 1 - data[i * width + j];
           }
-          image[(height - 1) - i] = row;
+          image[height - 1 - i] = row;
         }
         return {
           z: image,
@@ -54,8 +54,8 @@
           ldiv.classList.add("layer");
           plot.appendChild(ldiv);
         }
-        const err = document.createElement("p")
-        err.id = 'network-error'
+        const err = document.createElement("p");
+        err.id = "network-error";
         plot.appendChild(err);
       }
 
@@ -71,19 +71,20 @@
               yaxis: { visible: false },
               showLegend: false,
               margin: { autoexpand: false, l: 0, r: 0, t: 0, b: 0 },
-            }
-            const config = { staticPlot: true, displayModeBar: false }
+            };
+            const config = { staticPlot: true, displayModeBar: false };
             Plotly.react(div, [image], layout, config);
           }
         }
-        document.getElementById('network-error').innerText = `Error: ${network.meanSquaredError}`
+        document.getElementById(
+          "network-error"
+        ).innerText = `Error: ${network.meanSquaredError}`;
       }
 
       /**
        * The entry point of the program.
        */
       async function main() {
-
         const worker = new Worker("./js/worker.js", { type: "module" });
         worker.onmessage = (event) => {
           const { data } = event;
@@ -112,7 +113,15 @@
         worker.onerror = (event) => {
           console.error(event);
         };
-        worker.postMessage({ type: "init", payload: { sizes: [16, 11], learningRate: 3, epochs: 20, batchSize: 100 } });
+        worker.postMessage({
+          type: "init",
+          payload: {
+            sizes: [16, 11],
+            learningRate: 3,
+            epochs: 20,
+            batchSize: 100,
+          },
+        });
       }
 
       main();

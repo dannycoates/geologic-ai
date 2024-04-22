@@ -1,7 +1,8 @@
-
 async function fetchFile(path) {
   const response = await fetch(new URL(path, import.meta.url));
-  return await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  return await new Response(
+    response.body.pipeThrough(new DecompressionStream("gzip"))
+  ).arrayBuffer();
 }
 
 /**
@@ -26,12 +27,15 @@ function parseImages(buffer, count) {
   const images = new Array(count);
   const view = new DataView(buffer);
   let index = 8;
-  const rows = view.getUint32(index); //buffer.readUInt32BE(index);
+  const rows = view.getUint32(index);
   index += 4;
-  const cols = view.getUint32(index) //buffer.readUInt32BE(index);
+  const cols = view.getUint32(index);
   index += 4;
   for (let i = 0; i < count; i++) {
-    images[i] = Float64Array.from({ length: rows * cols }, () => view.getUint8(index++) / 255);
+    images[i] = Float64Array.from(
+      { length: rows * cols },
+      () => view.getUint8(index++) / 255
+    );
   }
   return images;
 }
@@ -68,10 +72,12 @@ function parseBuffer(buffer) {
  * @returns {Promise<LabelledInputData[]>} A promise that resolves to an array of objects containing the input and label data.
  */
 async function getData(imagePath, labelPath) {
-  const rawImages = await fetchFile(imagePath);
-  const rawLabels = await fetchFile(labelPath);
+  const [rawImages, rawLabels] = await Promise.all([
+    fetchFile(imagePath),
+    fetchFile(labelPath),
+  ]);
   const images = parseBuffer(rawImages);
-  const labels = parseBuffer(rawLabels)
+  const labels = parseBuffer(rawLabels);
   return images.map((input, i) => ({ input, label: labels[i] }));
 }
 
@@ -80,7 +86,10 @@ async function getData(imagePath, labelPath) {
  * @returns {Promise<LabelledInputData[]>>} A promise that resolves to an array of objects containing the input and label data.
  */
 export function trainingData() {
-  return getData("../data/train-images-idx3-ubyte.gz", "../data/train-labels-idx1-ubyte.gz");
+  return getData(
+    "../data/train-images-idx3-ubyte.gz",
+    "../data/train-labels-idx1-ubyte.gz"
+  );
 }
 
 /**
@@ -88,5 +97,8 @@ export function trainingData() {
  * @returns {Promise<LabelledInputData[]>>} A promise that resolves to an array of objects containing the input and label data.
  */
 export function testData() {
-  return getData("../data/t10k-images-idx3-ubyte.gz", "../data/t10k-labels-idx1-ubyte.gz");
+  return getData(
+    "../data/t10k-images-idx3-ubyte.gz",
+    "../data/t10k-labels-idx1-ubyte.gz"
+  );
 }
