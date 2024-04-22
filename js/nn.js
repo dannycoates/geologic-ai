@@ -25,6 +25,12 @@ export class NeuralNetwork {
   layers = [];
 
   /**
+   * The mean squared error of the neural network.
+   * @type {number}
+   */
+  meanSquaredError = 0;
+
+  /**
    * Creates a new instance of the NeuralNetwork class.
    * 
    * @param {...number} layerSizes - The sizes of the layers in the neural network.
@@ -51,7 +57,7 @@ export class NeuralNetwork {
   /**
    * Feeds forward the inputs through the neural network and calculates the outputs.
    * 
-   * @param {number[]} inputs - The input values.
+   * @param {Float64Array} inputs - The input values.
    * @returns {number[]} - The output values of the neural network.
    */
   feedForward(inputs) {
@@ -120,8 +126,9 @@ export class NeuralNetwork {
    *                              More epochs can improve accuracy, but can also lead to overfitting.
    * @param {number} [batchSize=1] - The number of samples to process before updating the weights.
    *                                 Larger batch sizes can speed up training, but may be less accurate.
+   * @returns {Generator<NeuralNetwork, void, void>} - A generator that yields the network after each epoch.
    */
-  train(inputs, learningRate = 1, epochs = 1, batchSize = 1) {
+  *train(inputs, learningRate = 1, epochs = 1, batchSize = 1) {
     console.time("Training time");
     const trainingData = inputs.map(({ input, label }) => ({
       input,
@@ -150,8 +157,9 @@ export class NeuralNetwork {
         }
         this.updateWeights(learningRate);
       }
+      this.meanSquaredError = error / epoch.length;
       console.timeEnd(`Epoch ${i}/${epochs}`);
-      console.log(`mean squared error: ${error / epoch.length}`);
+      yield this;
     }
     console.timeEnd("Training time");
   }
@@ -161,6 +169,12 @@ export class NeuralNetwork {
  * A layer of neurons in a neural network.
  */
 class Layer {
+  /**
+   * The unique identifier of the layer.
+   * @type {string}
+   */
+  id = '';
+
   /**
    * The neurons in the layer.
    * @type {Neuron[]}
@@ -174,6 +188,7 @@ class Layer {
    * @param {number} inputCount - The number of inputs per neuron.
    */
   constructor(neuronCount, inputCount) {
+    this.id = `l-${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
     this.neurons = Array.from(
       { length: neuronCount },
       () => new Neuron(inputCount)
@@ -187,11 +202,11 @@ class Layer {
   /**
    * Feeds forward the inputs through the layer and calculates the outputs.
    * 
-   * @param {number[]} inputs - The input values.
-   * @returns {number[]} - The output values of the layer.
+   * @param {Float64Array} inputs - The input values.
+   * @returns {Float64Array} - The output values of the layer.
    */
   feedForward(inputs) {
-    const outputs = Array(this.neurons.length);
+    const outputs = new Float64Array(this.neurons.length);
     for (let i = 0; i < this.neurons.length; i++) {
       outputs[i] = this.neurons[i].feedForward(inputs);
     }
@@ -232,6 +247,12 @@ class Layer {
  */
 class Neuron {
   /**
+   * The unique identifier of the neuron.
+   * @type {string}
+   */
+  id = '';
+
+  /**
    * The inputs to the neuron.
    * Each value is a number between 0 and 1.
    *
@@ -254,7 +275,7 @@ class Neuron {
    * A larger weight value makes it's corresponding input value more influential
    * in the output calculation.
    *
-   * @type {number[]}
+   * @type {Float64Array}
    */
   weights = [];
 
@@ -302,7 +323,7 @@ class Neuron {
    *
    * These deltas are summed over a batch of samples before updating the weights.
    *
-   * @type {number[]}
+   * @type {Float64Array}
    */
   deltaWeightSums = [];
 
@@ -321,19 +342,20 @@ class Neuron {
    * @param {number} inputCount - The number of inputs to the neuron.
    */
   constructor(inputCount) {
-    this.weights = Array.from(
+    this.id = `n-${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
+    this.weights = Float64Array.from(
       { length: inputCount },
-      () => Math.random() - 0.5 // random value between -0.5 and 0.5
+      () => (Math.random() - 0.5) * 0.5
     );
     this.bias = 0.1;
-    this.deltaWeightSums = Array(inputCount).fill(0);
+    this.deltaWeightSums = new Float64Array(inputCount); //Array(inputCount).fill(0);
   }
 
   /**
    * Feeds forward the inputs through the neuron and calculates the output.
    * Sigmoid is the activation function used to calculate the output value.
    *
-   * @param {number[]} inputs - The input values.
+   * @param {Float64Array} inputs - The input values.
    * @returns {number} - The output value of the neuron.
    */
   feedForward(inputs) {
@@ -396,6 +418,8 @@ class Neuron {
    * It is used by connected neurons in the previous layer to accumulate their error.
    * This is how the error is backpropagated through the network. It almost seems like
    * magic, but it's just the chain rule of calculus.
+   * 
+   * @see {@link https://en.wikipedia.org/wiki/Chain_rule}
    *
    * @param {number} index - The index of the weight.
    * @returns {number} - The error value.
@@ -444,14 +468,14 @@ function sigmoidDerivative(sigmoid) {
  * @param {number} inputLength - The length of the input data.
  * @param {number} outputLength - The length of the output data.
  * @param {number} length - The number of samples to generate.
- * @returns {{ input: number[], output: number[] }[]} An array of objects containing the input and output data.
+ * @returns {{ input: Float64Array, output: number[] }[]} An array of objects containing the input and output data.
  */
 function noise(inputLength = 28 * 28, outputLength = 11, length = 6000) {
   const output = Array(outputLength).fill(0);
   output[output.length - 1] = 1;
   return Array.from({ length }, () => {
     return {
-      input: Array.from({ length: inputLength }, () => Math.random()),
+      input: Float64Array.from({ length: inputLength }, () => Math.random()),
       output,
     };
   });

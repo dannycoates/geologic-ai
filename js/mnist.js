@@ -1,63 +1,64 @@
-import { readFile } from "node:fs/promises";
-import { gunzip } from "node:zlib";
-import { promisify } from "node:util";
 
-const gunzipAsync = promisify(gunzip);
+async function fetchFile(path) {
+  const response = await fetch(new URL(path, import.meta.url));
+  return await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+}
 
 /**
  * Parses the header of the MNIST data file.
- * @param {Buffer} buffer - The buffer containing the header data.
+ * @param {ArrayBuffer} buffer - The buffer containing the header data.
  * @returns {{ magic: number, count: number }} An object containing the magic number and count.
  */
 function parseHeader(buffer) {
-  const magic = buffer.readUInt32BE(0);
-  const count = buffer.readUInt32BE(4);
+  const view = new DataView(buffer);
+  const magic = view.getUint32(0);
+  const count = view.getUint32(4);
   return { magic, count };
 }
 
 /**
  * Parses the image data from the MNIST data file.
- * @param {Buffer} buffer - The buffer containing the image data.
+ * @param {ArrayBuffer} buffer - The buffer containing the image data.
  * @param {number} count - The number of images to parse.
- * @returns {number[][]} An array of image data, where each image is represented as an array of pixel values.
+ * @returns {Float64Array[]} An array of image data, where each image is represented as an array of pixel values.
  */
 function parseImages(buffer, count) {
   const images = new Array(count);
-  let index = 0;
-  const rows = buffer.readUInt32BE(index);
+  const view = new DataView(buffer);
+  let index = 8;
+  const rows = view.getUint32(index); //buffer.readUInt32BE(index);
   index += 4;
-  const cols = buffer.readUInt32BE(index);
+  const cols = view.getUint32(index) //buffer.readUInt32BE(index);
   index += 4;
   for (let i = 0; i < count; i++) {
-    images[i] = Array.from({ length: rows * cols }, () => buffer[index++] / 255);
+    images[i] = Float64Array.from({ length: rows * cols }, () => view.getUint8(index++) / 255);
   }
   return images;
 }
 
 /**
  * Parses the label data from the MNIST data file.
- * @param {Buffer} buffer - The buffer containing the label data.
- * @returns {number[]} An array of label data.
+ * @param {ArrayBuffer} buffer - The buffer containing the label data.
+ * @returns {Uint8Array} An array of label data.
  */
 function parseLabels(buffer) {
-  return Array.from(buffer);
+  return new Uint8Array(buffer.slice(8));
 }
 
 /**
  * Parses the buffer data from the MNIST data file.
- * @param {Buffer} buffer - The buffer containing the data.
- * @returns {number[][]|number[]|null} Parsed data based on the magic number in the header.
+ * @param {ArrayBuffer} buffer - The buffer containing the data.
+ * @returns {Float64Array[]|Uint8Array|null} Parsed data based on the magic number in the header.
  */
 function parseBuffer(buffer) {
   const { magic, count } = parseHeader(buffer);
-  const data = buffer.subarray(8);
-  if (magic === 2051) return parseImages(data, count);
-  if (magic === 2049) return parseLabels(data);
+  if (magic === 2051) return parseImages(buffer, count);
+  if (magic === 2049) return parseLabels(buffer);
   return null;
 }
 
 /**
- * @typedef {{ input: number[], label: number }} LabelledInputData
+ * @typedef {{ input: Float64Array, label: number }} LabelledInputData
  */
 
 /**
@@ -67,8 +68,8 @@ function parseBuffer(buffer) {
  * @returns {Promise<LabelledInputData[]>} A promise that resolves to an array of objects containing the input and label data.
  */
 async function getData(imagePath, labelPath) {
-  const rawImages = await gunzipAsync(await readFile(imagePath));
-  const rawLabels = await gunzipAsync(await readFile(labelPath));
+  const rawImages = await fetchFile(imagePath);
+  const rawLabels = await fetchFile(labelPath);
   const images = parseBuffer(rawImages);
   const labels = parseBuffer(rawLabels)
   return images.map((input, i) => ({ input, label: labels[i] }));

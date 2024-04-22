@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Geologic AI</title>
+    <script
+      src="https://cdn.plot.ly/plotly-2.31.1.min.js"
+      charset="utf-8"
+    ></script>
+    <style type="text/css">
+      .layer {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 114px);
+        grid-gap: 4px;
+        margin: 4px;
+      }
+      .neuron {
+        border: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="plot"></div>
+    <script type="module">
+      function toPlotlyImage(data) {
+        const width = Math.sqrt(data.length);
+        const height = width;
+        const image = Array(height);
+        for (let i = 0; i < height; i++) {
+          const row = Array(width);
+          for (let j = 0; j < width; j++) {
+            row[j] = 1 - data[i * width + j];
+          }
+          image[(height - 1) - i] = row;
+        }
+        return {
+          z: image,
+          type: "heatmap",
+          colorscale: "Greys",
+          showscale: false,
+        };
+      }
+
+      function initUI(network) {
+        const plot = document.getElementById("plot");
+        for (const layer of network.layers) {
+          const ldiv = document.createElement("div");
+          for (const neuron of layer.neurons) {
+            const ndiv = document.createElement("div");
+            ndiv.id = neuron.id;
+            ndiv.classList.add("neuron");
+            ldiv.appendChild(ndiv);
+          }
+          ldiv.id = layer.id;
+          ldiv.classList.add("layer");
+          plot.appendChild(ldiv);
+        }
+        const err = document.createElement("p")
+        err.id = 'network-error'
+        plot.appendChild(err);
+      }
+
+      function updateUI(network) {
+        for (const layer of network.layers) {
+          for (const neuron of layer.neurons) {
+            const div = document.getElementById(neuron.id);
+            const image = toPlotlyImage(neuron.weights);
+            const layout = {
+              width: 112,
+              height: 112,
+              xaxis: { visible: false },
+              yaxis: { visible: false },
+              showLegend: false,
+              margin: { autoexpand: false, l: 0, r: 0, t: 0, b: 0 },
+            }
+            const config = { staticPlot: true, displayModeBar: false }
+            Plotly.react(div, [image], layout, config);
+          }
+        }
+        document.getElementById('network-error').innerText = `Error: ${network.meanSquaredError}`
+      }
+
+      /**
+       * The entry point of the program.
+       */
+      async function main() {
+
+        const worker = new Worker("./js/worker.js", { type: "module" });
+        worker.onmessage = (event) => {
+          const { data } = event;
+          const { type, payload } = data;
+          switch (type) {
+            case "init":
+              initUI(payload);
+              updateUI(payload);
+              worker.postMessage({ type: "gen" });
+              break;
+            case "progress":
+              updateUI(payload);
+              worker.postMessage({ type: "gen" });
+              break;
+            case "done":
+              updateUI(payload);
+              worker.postMessage({ type: "test" });
+              break;
+            case "test":
+              console.log("Test result", payload);
+              break;
+            default:
+              console.log("Unknown message type", type);
+          }
+        };
+        worker.onerror = (event) => {
+          console.error(event);
+        };
+        worker.postMessage({ type: "init", payload: { sizes: [16, 11], learningRate: 3, epochs: 20, batchSize: 100 } });
+      }
+
+      main();
+    </script>
+  </body>
+</html>
