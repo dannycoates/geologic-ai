@@ -40,7 +40,7 @@ onmessage = async function (event) {
       nn = new NeuralNetwork(784, ...payload.sizes);
       learningRate = payload.learningRate;
       batchSize = payload.batchSize;
-      postMessage({ type: "init", payload: this.nn });
+      postMessage({ type: "init", payload: nn });
       break;
     }
     case "train": {

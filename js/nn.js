@@ -70,6 +70,9 @@ export class NeuralNetwork {
 
   /**
    * Backpropagates the error through the neural network.
+   * 
+   * For a mathematical introduction to backpropagation, watch:
+   * @see {@link https://www.youtube.com/watch?v=khUVIZ3MON8}
    *
    * @param {number[]} targetOutputs - The target output values from the training data.
    * @returns {number} - The mean squared error of this iteration.
@@ -89,20 +92,24 @@ export class NeuralNetwork {
       // between the target output and the actual output.
       // When the output is close to the target, the error is small.
       // The sign of the error tells us which direction to adjust the weights.
-      const error = target - neuron.output;
-      neuron.backpropagate(error);
+      const error = neuron.output - target;
       // Mean squared error is a simple way to measure the error.
       // Mathematically, it's referred to as a loss or cost function.
       // There are many other loss functions to choose from.
       // Ours is a quadratic loss function.
       // @see {@link https://en.wikipedia.org/wiki/Loss_function#Quadratic_loss_function}
+      //
+      // Our cost function is C = 1/2 * (output - target)^2
+      // So, the derivative of the cost function with respect to the output is:
+      // dC/d(output) = output - target
+      neuron.backpropagate(error);
       squaredErrorSum += error * error;
     }
 
     for (let i = this.layers.length - 2; i >= 0; i--) {
       this.layers[i].backpropagate(this.layers[i + 1]);
     }
-    return squaredErrorSum / targetOutputs.length;
+    return (squaredErrorSum / targetOutputs.length) / 2;
   }
 
   /**
@@ -395,10 +402,10 @@ class Neuron {
   updateWeights(learningRate) {
     for (let i = 0; i < this.weights.length; i++) {
       const averageDeltaWeight = this.deltaWeightSums[i] / this.sampleCounter;
-      this.weights[i] += learningRate * averageDeltaWeight;
+      this.weights[i] -= learningRate * averageDeltaWeight;
     }
     const averageDeltaBias = this.deltaBiasSum / this.sampleCounter;
-    this.bias += learningRate * averageDeltaBias;
+    this.bias -= learningRate * averageDeltaBias;
 
     // reset the sums and sample counter for the next batch
     this.sampleCounter = 0;
