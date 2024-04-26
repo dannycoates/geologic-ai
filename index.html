@@ -7,10 +7,19 @@
       charset="utf-8"
     ></script>
     <style type="text/css">
+      #plot {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        align-items: center;
+      }
+
       .layer {
         display: grid;
-        grid-template-columns: repeat(auto-fill, 114px);
-        grid-gap: 4px;
+        grid-template-columns: repeat(auto-fill, 57px);
+        grid-auto-flow: dense;
+        gap: 4px;
+        align-content: start;
         margin: 4px;
       }
       .neuron {
@@ -28,7 +37,7 @@
         for (let i = 0; i < height; i++) {
           const row = Array(width);
           for (let j = 0; j < width; j++) {
-            row[j] = 1 - data[i * width + j];
+            row[j] = data[i * width + j];
           }
           image[height - 1 - i] = row;
         }
@@ -54,57 +63,87 @@
           ldiv.classList.add("layer");
           plot.appendChild(ldiv);
         }
-        const err = document.createElement("p");
-        err.id = "network-error";
-        plot.appendChild(err);
+        const results = document.createElement("div");
+        results.id = "results";
+        results.classList.add("layer");
+        plot.appendChild(results);
       }
 
-      function updateUI(network) {
+      function updateUI(network, interactive = false) {
         for (const layer of network.layers) {
           for (const neuron of layer.neurons) {
             const div = document.getElementById(neuron.id);
             const image = toPlotlyImage(neuron.weights);
             const layout = {
-              width: 112,
-              height: 112,
+              width: 56,
+              height: 56,
               xaxis: { visible: false },
               yaxis: { visible: false },
               showLegend: false,
               margin: { autoexpand: false, l: 0, r: 0, t: 0, b: 0 },
             };
-            const config = { staticPlot: true, displayModeBar: false };
+            const config = { staticPlot: !interactive, displayModeBar: false };
             Plotly.react(div, [image], layout, config);
           }
         }
-        document.getElementById(
-          "network-error"
-        ).innerText = `Error: ${network.meanSquaredError}`;
+      }
+
+      function addIncorrect(incorrect) {
+        const results = document.getElementById("results");
+        for (const [label, data] of Array.from(incorrect.entries()).sort((a, b) => a[0] - b[0])) {
+          const div = document.createElement("div");    
+          const image = toPlotlyImage(data);
+          const layout = {
+            width: 56,
+            height: 56,
+            xaxis: { visible: false },
+            yaxis: { visible: false },
+            showLegend: false,
+            margin: { autoexpand: false, l: 0, r: 0, t: 0, b: 0 },
+          };
+          const config = { staticPlot: true, displayModeBar: false };
+          Plotly.newPlot(div, [image], layout, config);
+          
+          results.appendChild(div);
+        }
       }
 
       /**
        * The entry point of the program.
        */
       async function main() {
+        let epochs = 1;
+        let errors = []
         const worker = new Worker("./js/worker.js", { type: "module" });
         worker.onmessage = (event) => {
           const { data } = event;
           const { type, payload } = data;
           switch (type) {
             case "init":
+              worker.postMessage({ type: "train" });
+              console.time("Training time");
+              console.time(`Epoch ${epochs}`)
               initUI(payload);
               updateUI(payload);
-              worker.postMessage({ type: "gen" });
               break;
             case "progress":
-              updateUI(payload);
-              worker.postMessage({ type: "gen" });
-              break;
-            case "done":
-              updateUI(payload);
-              worker.postMessage({ type: "test" });
+              console.timeEnd(`Epoch ${epochs}`)
+              epochs++;
+              errors.push(payload.meanSquaredError)
+              if (errors[errors.length - 1] > errors[errors.length - 2]) {
+                console.timeEnd("Training time");
+                worker.postMessage({ type: "test" });
+                updateUI(payload, true);
+              } else {
+                worker.postMessage({ type: "train" });
+                console.time(`Epoch ${epochs}`)
+                console.log("MSE", payload.meanSquaredError);
+                updateUI(payload);
+              }
               break;
             case "test":
               console.log("Test result", payload);
+              addIncorrect(payload.incorrect);
               break;
             default:
               console.log("Unknown message type", type);
@@ -116,9 +155,8 @@
         worker.postMessage({
           type: "init",
           payload: {
-            sizes: [16, 11],
+            sizes: [25, 11],
             learningRate: 3,
-            epochs: 20,
             batchSize: 100,
           },
         });

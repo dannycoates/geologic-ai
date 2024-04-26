@@ -1,18 +1,18 @@
 /**
  * A fully connected feedforward neural network.
- * 
+ *
  * This type of neural network is made up of layers of neurons. Each layer gets
  * its input from the previous layer and feeds its output to the next layer. The
  * neurons in each layer take input from all the neurons in the previous layer.
- * 
+ *
  * The output of the last layer is the output of the network.
- * 
+ *
  * The network is trained using a supervised learning technique called backpropagation.
  * Supervised means that the network is given the correct answer during training. It
  * uses the correct answer to calculate the error of it's output and adjust the weights
  * and biases of the neurons to reduce the error. The algorithm used to adjust the weights
  * and biases is called stochastic gradient descent.
- * 
+ *
  * @see {@link https://en.wikipedia.org/wiki/Feedforward_neural_network}
  * @see {@link https://en.wikipedia.org/wiki/Backpropagation}
  * @see {@link https://en.wikipedia.org/wiki/Stochastic_gradient_descent}
@@ -32,7 +32,7 @@ export class NeuralNetwork {
 
   /**
    * Creates a new instance of the NeuralNetwork class.
-   * 
+   *
    * @param {...number} layerSizes - The sizes of the layers in the neural network.
    * @example
    * // create a network with 3 layers: 784 input, 16 hidden, 11 output
@@ -56,7 +56,7 @@ export class NeuralNetwork {
 
   /**
    * Feeds forward the inputs through the neural network and calculates the outputs.
-   * 
+   *
    * @param {Float64Array} inputs - The input values.
    * @returns {number[]} - The output values of the neural network.
    */
@@ -70,7 +70,7 @@ export class NeuralNetwork {
 
   /**
    * Backpropagates the error through the neural network.
-   * 
+   *
    * @param {number[]} targetOutputs - The target output values from the training data.
    * @returns {number} - The mean squared error of this iteration.
    *                     This tells us how well the network is learning.
@@ -107,7 +107,7 @@ export class NeuralNetwork {
 
   /**
    * Updates the weights and biases of the neural network.
-   * 
+   *
    * @param {number} learningRate - The learning rate.
    */
   updateWeights(learningRate) {
@@ -117,19 +117,15 @@ export class NeuralNetwork {
   }
 
   /**
-   * Trains the neural network using the given inputs and target outputs.
-   * 
+   * Trains the neural network for one epoch using the given inputs and target outputs.
+   *
    * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
    * @param {number} [learningRate=1] - The higher the learning rate, the faster the network learns.
    *                                However, if it's too high, the network may not converge.
-   * @param {number} [epochs=1] - The number of rounds of training to do over all the inputs.
-   *                              More epochs can improve accuracy, but can also lead to overfitting.
    * @param {number} [batchSize=1] - The number of samples to process before updating the weights.
    *                                 Larger batch sizes can speed up training, but may be less accurate.
-   * @returns {Generator<NeuralNetwork, void, void>} - A generator that yields the network after each epoch.
    */
-  *train(inputs, learningRate = 1, epochs = 1, batchSize = 1) {
-    console.time("Training time");
+  train(inputs, learningRate = 1, batchSize = 1) {
     const trainingData = inputs.map(({ input, label }) => ({
       input,
       // Transform the label into an array representing the desired output layer values.
@@ -137,31 +133,25 @@ export class NeuralNetwork {
         i === label ? 1 : 0
       ),
     }));
-    for (let i = 1; i <= epochs; i++) {
-      console.time(`Epoch ${i}/${epochs}`);
-      const epoch = trainingData
-        .concat(
-          noise(
-            trainingData[0].input.length,
-            trainingData[0].output.length,
-            trainingData.length / 10
-          )
+    const epoch = trainingData
+      .concat(
+        noise(
+          trainingData[0].input.length,
+          trainingData[0].output.length,
+          trainingData.length / 10
         )
-        .sort(() => Math.random() - 0.5);
-      let error = 0;
-      for (let j = 0; j < epoch.length; j += batchSize) {
-        const batch = epoch.slice(j, j + batchSize);
-        for (const { input, output } of batch) {
-          this.feedForward(input);
-          error += this.backpropagate(output);
-        }
-        this.updateWeights(learningRate);
+      )
+      .sort(() => Math.random() - 0.5);
+    let error = 0;
+    for (let j = 0; j < epoch.length; j += batchSize) {
+      const batch = epoch.slice(j, j + batchSize);
+      for (const { input, output } of batch) {
+        this.feedForward(input);
+        error += this.backpropagate(output);
       }
-      this.meanSquaredError = error / epoch.length;
-      console.timeEnd(`Epoch ${i}/${epochs}`);
-      yield this;
+      this.updateWeights(learningRate);
     }
-    console.timeEnd("Training time");
+    this.meanSquaredError = error / epoch.length;
   }
 }
 
@@ -173,7 +163,7 @@ class Layer {
    * The unique identifier of the layer.
    * @type {string}
    */
-  id = '';
+  id = "";
 
   /**
    * The neurons in the layer.
@@ -189,7 +179,7 @@ class Layer {
 
   /**
    * Creates a new instance of the Layer class.
-   * 
+   *
    * @param {number} neuronCount - The number of neurons in the layer.
    * @param {number} inputCount - The number of inputs per neuron.
    */
@@ -208,7 +198,7 @@ class Layer {
 
   /**
    * Feeds forward the inputs through the layer and calculates the outputs.
-   * 
+   *
    * @param {Float64Array} inputs - The input values.
    * @returns {Float64Array} - The output values of the layer.
    */
@@ -221,12 +211,12 @@ class Layer {
 
   /**
    * Backpropagates the error through the layer.
-   * 
+   *
    * @param {Layer} nextLayer - The next layer in the neural network.
    */
   backpropagate(nextLayer) {
     for (let i = 0; i < this.neurons.length; i++) {
-      // The error for this neuron is the sum of the error of all 
+      // The error for this neuron is the sum of the error of all
       // the weights that took the output of this neuron as input.
       let error = 0;
       for (const neuron of nextLayer.neurons) {
@@ -238,7 +228,7 @@ class Layer {
 
   /**
    * Updates the weights and biases of the neurons in the layer.
-   * 
+   *
    * @param {number} learningRate - The learning rate.
    */
   updateWeights(learningRate) {
@@ -256,7 +246,7 @@ class Neuron {
    * The unique identifier of the neuron.
    * @type {string}
    */
-  id = '';
+  id = "";
 
   /**
    * The inputs to the neuron.
@@ -420,11 +410,11 @@ class Neuron {
    * Calculates the error for a given weight index.
    * It is proportional to the error of the neuron, the weight, and the derivative
    * of the activation function on the output value.
-   * 
+   *
    * It is used by connected neurons in the previous layer to accumulate their error.
    * This is how the error is backpropagated through the network. It almost seems like
    * magic, but it's just the chain rule of calculus.
-   * 
+   *
    * @see {@link https://en.wikipedia.org/wiki/Chain_rule}
    *
    * @param {number} index - The index of the weight.
@@ -444,7 +434,7 @@ class Neuron {
  * Other activation functions like ReLU (Rectified Linear Unit)
  * may also be used, but sigmoid is simple and works well for
  * this example.
- * 
+ *
  * @see {@link https://en.wikipedia.org/wiki/Sigmoid_function}
  *
  * @param {number} x - The input value.
@@ -470,7 +460,7 @@ function sigmoidDerivative(sigmoid) {
  * Random noise data that is labeled as outside the normal range of output.
  * This can be used to train the neural network to recognize when the input
  * data is not a valid element in the expected set.
- * 
+ *
  * @param {number} inputLength - The length of the input data.
  * @param {number} outputLength - The length of the output data.
  * @param {number} length - The number of samples to generate.
