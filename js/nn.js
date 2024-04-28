@@ -30,6 +30,10 @@ export class NeuralNetwork {
    */
   meanSquaredError = 0;
 
+  static async create(...layerSizes) {
+    return new NeuralNetwork(...layerSizes);
+  }
+
   /**
    * Creates a new instance of the NeuralNetwork class.
    *
@@ -126,26 +130,19 @@ export class NeuralNetwork {
   /**
    * Trains the neural network for one epoch using the given inputs and target outputs.
    *
-   * @param {import("./mnist").LabelledInputData[]} inputs - The input values.
+   * @param {{input: Float64Array, output: Float64Array}[]} data - The input values.
    * @param {number} [learningRate=1] - The higher the learning rate, the faster the network learns.
    *                                However, if it's too high, the network may not converge.
    * @param {number} [batchSize=1] - The number of samples to process before updating the weights.
    *                                 Larger batch sizes can speed up training, but may be less accurate.
    */
-  train(inputs, learningRate = 1, batchSize = 1) {
-    const trainingData = inputs.map(({ input, label }) => ({
-      input,
-      // Transform the label into an array representing the desired output layer values.
-      output: Array.from({ length: this.outputLayer.size }, (_, i) =>
-        i === label ? 1 : 0
-      ),
-    }));
-    const epoch = trainingData
+  async train(data, learningRate = 1, batchSize = 1) {
+    const epoch = data
       .concat(
         noise(
-          trainingData[0].input.length,
-          trainingData[0].output.length,
-          trainingData.length / 10
+          data[0].input.length,
+          data[0].output.length,
+          data.length / 10
         )
       )
       .sort(() => Math.random() - 0.5);
@@ -159,6 +156,20 @@ export class NeuralNetwork {
       this.updateWeights(learningRate);
     }
     this.meanSquaredError = error / epoch.length;
+  }
+
+  convertData(inputs) {
+    return inputs.map(({ input, label }) => ({
+      input,
+      // Transform the label into an array representing the desired output layer values.
+      output: Float64Array.from({ length: this.outputLayer.size }, (_, i) =>
+        i === label ? 1 : 0
+      ),
+    }));
+  }
+
+  uiData() {
+    return this
   }
 }
 
