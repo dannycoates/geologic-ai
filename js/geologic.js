@@ -54,6 +54,10 @@ export class NeuralNetwork {
     return new NeuralNetwork(settings, ...layerSizes);
   }
 
+  static async load() {
+    //TODO
+  }
+
   /**
    * Creates a new instance of the NeuralNetwork class.
    *
@@ -195,6 +199,10 @@ export class NeuralNetwork {
 
   uiData() {
     return this
+  }
+
+  async save() {
+    //TODO
   }
 }
 

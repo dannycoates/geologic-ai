@@ -12,10 +12,21 @@ export class TFNetwork {
     return new TFNetwork(settings, ...layerSizes);
   }
 
-  constructor(settings, ...layerSizes) {
+  static async load() {
+    const model = await tf.loadLayersModel("indexeddb://model");
+    const network = new TFNetwork(model);
+    return network;
+  }
+
+  constructor(settingsOrModel, ...layerSizes) {
+    if (settingsOrModel instanceof tf.Sequential) {
+      this.model = settingsOrModel;
+      this.inputSizes = [this.model.inputs[0].shape[1]].concat(this.model.layers.map((l) => l.units));
+      return;
+    }
     this.inputSizes = layerSizes.slice();
     const inputCount = layerSizes.shift();
-    this.learningRate = settings.learningRate ?? 1;
+    this.learningRate = settingsOrModel.learningRate ?? 1;
     this.model = tf.sequential();
     this.model.add(
       tf.layers.dense({
@@ -82,6 +93,10 @@ export class TFNetwork {
   feedForward(inputs) {
     const x = tf.tensor2d(Float32Array.from(inputs), [1, this.inputSizes[0]]);
     return this.model.predict(x).dataSync();
+  }
+
+  async save() {
+    return await this.model.save("indexeddb://model");
   }
 
   uiData() {
