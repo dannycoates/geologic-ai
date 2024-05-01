@@ -1,4 +1,4 @@
-import { NeuralNetwork } from "./nn.js";
+import { NeuralNetwork } from "./geologic.js";
 import { trainingData, testData } from "./mnist.js";
 import { TFNetwork } from "./tfjs.js";
 
@@ -7,18 +7,6 @@ import { TFNetwork } from "./tfjs.js";
  * @type {NeuralNetwork}
  */
 let nn;
-
-/**
- * The training data
- * @type {any}
- */
-let training;
-
-/**
- * The learning rate
- * @type {number}
- */
-let learningRate = 3;
 
 /**
  * The batch size
@@ -37,19 +25,19 @@ onmessage = async function (event) {
   const { type, payload } = data;
   switch (type) {
     case "init": {
-      if (payload.engine === "geologic") {
-        nn = await NeuralNetwork.create(784, ...payload.sizes);
-      } else {
-        nn = await TFNetwork.create(784, ...payload.sizes);
-      }
-      training = nn.convertData(await trainingData());
-      learningRate = payload.learningRate;
+      const NN = payload.engine === "geologic" ? NeuralNetwork : TFNetwork;
+      nn = await NN.create(
+        { learningRate: payload.learningRate },
+        784,
+        ...payload.sizes
+      );
+      nn.setTrainingData(await trainingData());
       batchSize = payload.batchSize;
       postMessage({ type: "init", payload: nn.uiData() });
       break;
     }
     case "train": {
-      await nn.train(training, learningRate, batchSize);
+      await nn.train(batchSize);
       postMessage({ type: "progress", payload: nn.uiData() });
       break;
     }

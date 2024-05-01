@@ -28,26 +28,48 @@ export class NeuralNetwork {
    * The mean squared error of the neural network.
    * @type {number}
    */
-  meanSquaredError = 0;
+  loss = 0;
 
-  static async create(...layerSizes) {
-    return new NeuralNetwork(...layerSizes);
+  /**
+   * The learning rate of the neural network.
+   * The higher the learning rate, the faster the network learns.
+   * However, if it's too high, the network may not converge.
+   * @type {number}
+   */
+  learningRate = 1;
+
+  /**
+   * The training data for the neural network.
+   * @type {{ input: Float64Array, output: Float64Array }[]}
+   */
+  trainingData = null;
+
+  /**
+   * Creates a new instance of the NeuralNetwork class.
+   * @param {Object} settings - The settings for the neural network.
+   * @param {...number} layerSizes - The sizes of the layers in the neural network.
+   * @returns {Promise<NeuralNetwork>} - A new instance of the NeuralNetwork class.
+   */
+  static async create(settings, ...layerSizes) {
+    return new NeuralNetwork(settings, ...layerSizes);
   }
 
   /**
    * Creates a new instance of the NeuralNetwork class.
    *
+   * @param {Object} settings - The settings for the neural network.
    * @param {...number} layerSizes - The sizes of the layers in the neural network.
    * @example
    * // create a network with 3 layers: 784 input, 16 hidden, 11 output
    * const network = new NeuralNetwork(784, 16, 11);
    */
-  constructor(...layerSizes) {
+  constructor(settings, ...layerSizes) {
     // The input layer is implicit.
     // It's size determines the number of inputs to the next layer.
     for (let i = 1; i < layerSizes.length; i++) {
       this.layers.push(new Layer(layerSizes[i], layerSizes[i - 1]));
     }
+    this.learningRate = settings.learningRate ?? 1;
   }
 
   /**
@@ -113,7 +135,7 @@ export class NeuralNetwork {
     for (let i = this.layers.length - 2; i >= 0; i--) {
       this.layers[i].backpropagate(this.layers[i + 1]);
     }
-    return (squaredErrorSum / targetOutputs.length) / 2;
+    return (squaredErrorSum / targetOutputs.length);
   }
 
   /**
@@ -130,13 +152,12 @@ export class NeuralNetwork {
   /**
    * Trains the neural network for one epoch using the given inputs and target outputs.
    *
-   * @param {{input: Float64Array, output: Float64Array}[]} data - The input values.
-   * @param {number} [learningRate=1] - The higher the learning rate, the faster the network learns.
-   *                                However, if it's too high, the network may not converge.
    * @param {number} [batchSize=1] - The number of samples to process before updating the weights.
    *                                 Larger batch sizes can speed up training, but may be less accurate.
+   * @returns {Promise<void>}
    */
-  async train(data, learningRate = 1, batchSize = 1) {
+  async train(batchSize = 1) {
+    const data = this.trainingData;
     const epoch = data
       .concat(
         noise(
@@ -153,13 +174,17 @@ export class NeuralNetwork {
         this.feedForward(input);
         error += this.backpropagate(output);
       }
-      this.updateWeights(learningRate);
+      this.updateWeights(this.learningRate);
     }
-    this.meanSquaredError = error / epoch.length;
+    this.loss = error / epoch.length;
   }
 
-  convertData(inputs) {
-    return inputs.map(({ input, label }) => ({
+  /**
+   * Sets the training data for the neural network.
+   * @param {{ input: Float64Array, label: number }[]} data - The training data.
+   */
+  setTrainingData(data) {
+    this.trainingData = data.map(({ input, label }) => ({
       input,
       // Transform the label into an array representing the desired output layer values.
       output: Float64Array.from({ length: this.outputLayer.size }, (_, i) =>

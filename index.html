@@ -129,15 +129,16 @@
             case "progress":
               console.timeEnd(`Epoch ${epochs}`)
               epochs++;
-              errors.push(payload.meanSquaredError)
+              errors.push(payload.loss)
               if (errors[errors.length - 1] > errors[errors.length - 2]) {
                 console.timeEnd("Training time");
+                console.log(payload)
                 worker.postMessage({ type: "test" });
                 updateUI(payload, true);
               } else {
                 worker.postMessage({ type: "train" });
                 console.time(`Epoch ${epochs}`)
-                console.log("MSE", payload.meanSquaredError);
+                console.log("loss", payload.loss);
                 updateUI(payload);
               }
               break;
@@ -155,10 +156,11 @@
         worker.postMessage({
           type: "init",
           payload: {
+            // engine: "tfjs", 
             engine: "geologic",
-            sizes: [25, 11],
+            sizes: [25, 10],
             learningRate: 3,
-            batchSize: 100,
+            batchSize: 320,
           },
         });
       }
