@@ -54,8 +54,47 @@ export class NeuralNetwork {
     return new NeuralNetwork(settings, ...layerSizes);
   }
 
+  static #parseModel(model) {
+    const layers = model.modelTopology.config.layers;
+    const layerSizes = layers[0].config.batch_input_shape.slice(1).concat(layers.map((l) => l.config.units));
+    const allWeights = new Float32Array(model.weightData);
+    const network = new NeuralNetwork({ learningRate: 3 }, ...layerSizes);
+    let start = 0;
+    for (let i = 0; i < network.layers.length; i++) {
+      const layer = network.layers[i];
+      for (let j = 0; j < layerSizes[i]; j++) {
+        for (let k = 0; k < layer.neurons.length; k++) {
+          layer.neurons[k].weights[j] = allWeights[start++]
+        }
+      }
+      for (let j = 0; j < layer.neurons.length; j++) {
+        layer.neurons[j].bias = allWeights[start++]
+      }
+    }
+    return network;
+  }
+
   static async load() {
-    //TODO
+    return new Promise((resolve, reject) => {
+      const dbopen = self.indexedDB.open("tensorflowjs");
+      dbopen.onsuccess = () => {
+        const db = dbopen.result;
+        const transaction = db.transaction("models_store", "readonly");
+        const store = transaction.objectStore("models_store");
+        const request = store.get("model");
+        request.onsuccess = () => {
+          const model = request.result.modelArtifacts;
+          const network = NeuralNetwork.#parseModel(model);
+          resolve(network);
+        };
+        request.onerror = () => {
+          reject(request.error);
+        };
+      }
+      dbopen.onerror = () => {
+        reject(dbopen.error);
+      };
+    });
   }
 
   /**

@@ -100,18 +100,23 @@ export class TFNetwork {
   }
 
   uiData() {
+    const layerCount = this.model.layers.length;
     let id = 0;
-    const layers = [];
-    for (let i = 0; i < this.model.layers.length; i++) {
+    const layers = Array(layerCount);
+    for (let i = 0; i < layerCount; i++) {
       const weightCount = this.inputSizes[i];
       // weights[0] is the input weights, [1] is the biases
-      const allWeights = this.model.layers[i].getWeights(true)[0].dataSync();
-      const neurons = [];
-      for (let j = 0; j < allWeights.length; j += weightCount) {
-        const weights = allWeights.subarray(j, j + weightCount);
-        neurons.push({ id: `n_${id++}`, weights });
+      const allWeights = this.model.layers[i].getWeights()[0].arraySync();
+      const neuronCount = allWeights[0].length
+      const neurons = Array(neuronCount);
+      for (let n = 0; n < neuronCount; n++) {
+        const weights = Array(weightCount);
+        for (let j = 0; j < weightCount; j++) {
+          weights[j] = allWeights[j][n];
+        }
+        neurons[n] = { id: `n_${id++}`, weights };
       }
-      layers.push({ id: `l_${id++}`, neurons });
+      layers[i] = { id: `l_${id++}`, neurons };
     }
     return {
       loss: this.loss,
