@@ -13,7 +13,7 @@ export class TFNetwork {
   }
 
   static async load() {
-    const model = await tf.loadLayersModel("indexeddb://model");
+    const model = await tf.loadLayersModel("indexeddb://geologic-model");
     const network = new TFNetwork(model);
     return network;
   }
@@ -96,7 +96,7 @@ export class TFNetwork {
   }
 
   async save() {
-    return await this.model.save("indexeddb://model");
+    return await this.model.save("indexeddb://geologic-model");
   }
 
   uiData() {
