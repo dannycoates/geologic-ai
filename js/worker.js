@@ -1,6 +1,7 @@
 import { NeuralNetwork } from "./geologic.js";
 import { trainingData, testData } from "./mnist.js";
 import { TFNetwork } from "./tfjs.js";
+import { PersistentStorage } from "./persistentStorage.js";
 
 /**
  * The neural network
@@ -42,13 +43,16 @@ onmessage = async function (event) {
       break;
     }
     case "load": {
-      const NN = payload.engine === "geologic" ? NeuralNetwork : TFNetwork;
-      nn = await NN.load();
+      nn = await PersistentStorage.load(payload.engine);
       postMessage({ type: "loaded", payload: nn.uiData() });
       break;
     }
+    case "save": {
+      await PersistentStorage.save(nn);
+      postMessage({ type: "saved" });
+      break;
+    }
     case "test": {
-      await nn.save()
       const test = await testData();
       let correct = 0;
       // We save one example of each incorrectly predicted digit

@@ -132,8 +132,7 @@
               errors.push(payload.loss)
               if (errors[errors.length - 1] > errors[errors.length - 2]) {
                 console.timeEnd("Training time");
-                console.log(payload)
-                worker.postMessage({ type: "test" });
+                worker.postMessage({ type: "save" });
                 updateUI(payload, true);
               } else {
                 worker.postMessage({ type: "train" });
@@ -145,6 +144,10 @@
             case "loaded": {
               initUI(payload);
               updateUI(payload);
+              worker.postMessage({ type: "test" });
+              break;
+            }
+            case "saved": {
               worker.postMessage({ type: "test" });
               break;
             }

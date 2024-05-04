@@ -12,12 +12,6 @@ export class TFNetwork {
     return new TFNetwork(settings, ...layerSizes);
   }
 
-  static async load() {
-    const model = await tf.loadLayersModel("indexeddb://geologic-model");
-    const network = new TFNetwork(model);
-    return network;
-  }
-
   constructor(settingsOrModel, ...layerSizes) {
     if (settingsOrModel instanceof tf.Sequential) {
       this.model = settingsOrModel;
@@ -93,10 +87,6 @@ export class TFNetwork {
   feedForward(inputs) {
     const x = tf.tensor2d(Float32Array.from(inputs), [1, this.inputSizes[0]]);
     return this.model.predict(x).dataSync();
-  }
-
-  async save() {
-    return await this.model.save("indexeddb://geologic-model");
   }
 
   uiData() {
