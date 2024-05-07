@@ -31,7 +31,7 @@
     <div id="plot"></div>
     <script type="module">
       function toPlotlyImage(data) {
-        const width = Math.sqrt(data.length);
+        const width = Math.ceil(Math.sqrt(data.length));
         const height = width;
         const image = Array(height);
         for (let i = 0; i < height; i++) {

@@ -403,7 +403,7 @@ class Neuron {
     for (let i = 0; i < inputs.length; i++) {
       weightedSum += inputs[i] * this.weights[i];
     }
-    this.output = sigmoid(weightedSum + this.bias);
+    this.output = activation(weightedSum + this.bias);
     return this.output;
   }
 
@@ -417,7 +417,7 @@ class Neuron {
   backpropagate(error) {
     this.error = error;
     // remember, this.output is a sigmoid value
-    const delta = error * sigmoidDerivative(this.output);
+    const delta = error * activationDerivative(this.output);
     this.deltaBiasSum += delta;
     for (let i = 0; i < this.inputs.length; i++) {
       this.deltaWeightSums[i] += delta * this.inputs[i];
@@ -464,7 +464,7 @@ class Neuron {
    * @returns {number} - The error value.
    */
   errorForWeight(index) {
-    return this.error * this.weights[index] * sigmoidDerivative(this.output);
+    return this.error * this.weights[index] * activationDerivative(this.output);
   }
 }
 
@@ -483,7 +483,7 @@ class Neuron {
  * @param {number} x - The input value.
  * @returns {number} - The sigmoid value.
  */
-function sigmoid(x) {
+function activation(x) {
   return 1 / (1 + Math.exp(-x));
 }
 
@@ -495,7 +495,7 @@ function sigmoid(x) {
  * @param {number} sigmoid - A sigmoid value (0-1) computed earlier.
  * @returns {number} - The sigmoid derivative value.
  */
-function sigmoidDerivative(sigmoid) {
+function activationDerivative(sigmoid) {
   return sigmoid * (1 - sigmoid);
 }
 
